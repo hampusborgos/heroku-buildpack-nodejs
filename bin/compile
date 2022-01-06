@@ -342,7 +342,9 @@ cache_build() {
   cache_directories="$(get_cache_directories "$BUILD_DIR")"
 
   clear_cache "$CACHE_DIR"
-  if ! ${NODE_MODULES_CACHE:-true}; then
+  if $PNPM; then
+    echo "- pnpm (nothing to cache)"
+  elif ! ${NODE_MODULES_CACHE:-true}; then
     # we've already warned that caching is disabled in the restore step
     # so be silent here
     :
