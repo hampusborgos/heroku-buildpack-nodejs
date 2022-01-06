@@ -52,6 +52,8 @@ source "$BP_DIR/lib/metadata.sh"
 source "$BP_DIR/lib/features.sh"
 # shellcheck source=lib/builddata.sh
 source "$BP_DIR/lib/builddata.sh"
+# shellcheck source=lib/pnpm.sh
+source "$BP_DIR/lib/pnpm.sh"
 # shellcheck source=lib/yarn-2.sh
 source "$BP_DIR/lib/yarn-2.sh"
 
@@ -96,6 +98,7 @@ meta_set "build-step" "init"
 
 [ -e "$BUILD_DIR/node_modules" ] && PREBUILD=true || PREBUILD=false
 [ -f "$BUILD_DIR/yarn.lock" ] && YARN=true || YARN=false
+[ -f "$BUILD_DIR/pnpm-lock.yaml" ] && PNPM=true || PNPM=false
 [ -f "$BUILD_DIR/package-lock.json" ] && NPM_LOCK=true || NPM_LOCK=false
 YARN_2=$(detect_yarn_2 "$YARN" "$BUILD_DIR")
 
@@ -217,6 +220,13 @@ install_bins() {
   mcount "version.node.$node_version"
   meta_set "node-version" "$node_version"
 
+  if $PNPM; then
+    meta_set "build-step" "install-pnpm"
+    echo "-----> Install pnpm"
+    curl -sL https://unpkg.com/@pnpm/self-installer | node
+    pnpm config set store-dir "$CACHE_DIR"/.pnpm-store
+  fi
+
   # Download yarn if there is a yarn.lock file or if the user
   # has specified a version of yarn under "engines". We'll still
   # only install using yarn if there is a yarn.lock file
@@ -304,6 +314,8 @@ build_dependencies() {
     yarn_2_install "$BUILD_DIR"
   elif $YARN; then
     yarn_node_modules "$BUILD_DIR"
+  elif $PNPM; then
+    pnpm_node_modules "$BUILD_DIR"
   elif $PREBUILD; then
     echo "Prebuild detected (node_modules already exists)"
     npm_rebuild "$BUILD_DIR"
@@ -348,6 +360,8 @@ cache_build() {
 prune_devdependencies() {
   if $YARN || $YARN_2; then
     yarn_prune_devdependencies "$BUILD_DIR" "$YARN_CACHE_FOLDER"
+  elif $PNPM; then
+    echo "Not pruning when using pnpm"
   else
     npm_prune_devdependencies "$BUILD_DIR"
   fi
@@ -365,6 +379,12 @@ elif "$YARN" && "$USE_YARN_CACHE" && [[ "$(get_cache_directories "$BUILD_DIR")" 
   prune_devdependencies | output "$LOG_FILE"
   meta_set "build-step" "save-cache"
   cache_build | output "$LOG_FILE"
+elif $PNPM; then
+  meta_set "build-step" "save-cache"
+  cache_build | output "$LOG_FILE"
+  meta_set "build-step" "prune-dependencies"
+  header "Pruning devDependencies" | output "$LOG_FILE"
+  prune_devdependencies | output "$LOG_FILE"
 else
   meta_set "build-step" "save-cache"
   cache_build | output "$LOG_FILE"

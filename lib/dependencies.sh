@@ -140,6 +140,15 @@ yarn_node_modules() {
   monitor "yarn-install" yarn install --production="$production" --frozen-lockfile --ignore-engines --prefer-offline 2>&1
 }
 
+pnpm_node_modules() {
+  local build_dir=${1:-}
+  local production=${PNPM_PRODUCTION:-false}
+
+  echo "Installing node modules (pnpm-lock.yaml)"
+  cd "$build_dir" || return
+  monitor "pnpm-install" pnpm install
+}
+
 yarn_2_install() {
   local build_dir=${1:-}
 
